@@ -56,6 +56,39 @@ Detailed implementation roadmap including:
 
 ---
 
+### 🚀 [Development Setup Guide](development-setup.md)
+**Get your environment running**
+
+Step-by-step guide to setting up your local development environment:
+- Prerequisites and required software
+- Quick start with Docker (recommended)
+- Manual setup without Docker
+- Environment variable configuration
+- Project structure setup
+- Development workflow
+- Troubleshooting common issues
+- Useful commands cheat sheet
+
+**Best for**: New developers, environment setup, troubleshooting
+
+---
+
+### 🐳 [Docker Configuration](docker-setup.md)
+**Containerized deployment guide**
+
+Complete Docker setup and configuration:
+- Docker Compose files for development and production
+- Dockerfile configurations for all services
+- Environment variables for containers
+- Docker commands reference
+- Production deployment with Kubernetes
+- Security best practices
+- Container troubleshooting
+
+**Best for**: DevOps, containerized deployments, production setup
+
+---
+
 ## Quick Start Guide
 
 ### For Stakeholders
@@ -66,8 +99,9 @@ Detailed implementation roadmap including:
 ### For Developers
 1. Review [Technical Specification](technical-spec.md) for context
 2. Study [Architecture Document](architecture.md) for your area
-3. Follow [Implementation Plan](implementation-plan.md) for tasks
-4. Set up development environment (Phase 1)
+3. Follow [Development Setup Guide](development-setup.md) to set up your environment
+4. Use [Docker Configuration](docker-setup.md) for containerized setup
+5. Follow [Implementation Plan](implementation-plan.md) for tasks
 
 ### For Project Managers
 1. Review [Implementation Plan](implementation-plan.md) timeline
