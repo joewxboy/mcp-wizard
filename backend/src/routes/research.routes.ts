@@ -12,16 +12,14 @@ const router = express.Router();
 // Discover MCP servers
 router.post('/discover',
   researchLimiter,
-  validators.search,
-  validators.limit,
-  handleValidationErrors,
+  express.json(),
   async (req, res) => {
     try {
-      const { query, limit = 30 } = req.query as { query?: string; limit?: string };
+      const { query, limit = 30 } = req.body as { query?: string; limit?: number };
 
       const options = {
         query: query || 'MCP server',
-        maxResults: Math.min(parseInt(limit) || 30, 100), // Max 100 results
+        maxResults: Math.min(limit || 30, 100), // Max 100 results
         minStars: 5, // Require at least 5 stars
       };
 

@@ -5,6 +5,7 @@ import { PackageMetadataExtractor, packageMetadataExtractor } from './PackageMet
 import { MCPServer } from '@mcp-wizard/shared';
 import { logger } from '../../utils/logger';
 import { setCache, getCache } from '../../config/redis';
+import { prisma } from '../../db/database';
 
 export interface ResearchOptions {
   query?: string;
@@ -84,6 +85,9 @@ export class ResearchService {
       const sortedServers = allServers
         .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
         .slice(0, maxResults);
+
+      // Save discovered servers to database
+      await this.saveDiscoveredServers(sortedServers);
 
       // Cache results for 1 hour
       await setCache(cacheKey, sortedServers, 3600);
@@ -363,6 +367,77 @@ export class ResearchService {
         rateLimit: null,
       },
     };
+  }
+
+  /**
+   * Save discovered servers to database
+   */
+  private async saveDiscoveredServers(servers: MCPServer[]): Promise<void> {
+    try {
+      logger.info(`Saving ${servers.length} discovered servers to database`);
+
+      let savedCount = 0;
+      for (const server of servers) {
+        try {
+          logger.debug(`Saving server: ${server.id}`);
+
+          // Use upsert to avoid duplicates
+          await prisma.mCPServer.upsert({
+            where: { id: server.id },
+            update: {
+              name: server.name,
+              description: server.description,
+              version: server.version,
+              author: server.author,
+              license: server.license,
+              tags: server.tags,
+              readme: server.readme,
+              tools: server.tools,
+              resources: server.resources,
+              prompts: server.prompts,
+              configTemplate: server.configTemplate,
+              requiredParams: server.requiredParams,
+              optionalParams: server.optionalParams,
+              popularity: server.popularity,
+              lastResearchedAt: new Date(),
+            },
+            create: {
+              id: server.id,
+              name: server.name,
+              description: server.description,
+              source: server.source,
+              sourceUrl: server.sourceUrl,
+              packageName: server.packageName,
+              version: server.version,
+              author: server.author,
+              license: server.license,
+              tags: server.tags,
+              readme: server.readme,
+              tools: server.tools,
+              resources: server.resources,
+              prompts: server.prompts,
+              configTemplate: server.configTemplate,
+              requiredParams: server.requiredParams,
+              optionalParams: server.optionalParams,
+              popularity: server.popularity,
+              verified: server.verified,
+              lastResearchedAt: new Date(),
+            },
+          });
+
+          savedCount++;
+        } catch (error) {
+          logger.warn(`Failed to save server ${server.id}:`, error);
+          // Continue with other servers
+        }
+      }
+
+      logger.info(`Successfully saved ${savedCount}/${servers.length} discovered servers to database`);
+
+    } catch (error) {
+      logger.error('Error saving discovered servers:', error);
+      // Don't throw - discovery should succeed even if saving fails
+    }
   }
 
   /**
