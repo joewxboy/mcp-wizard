@@ -3,20 +3,14 @@ import { verifyAccessToken, JWTPayload } from '../config/jwt';
 import { logger } from '../utils/logger';
 
 // Extend Express Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: JWTPayload;
   }
 }
 
 // Authentication middleware
-export const authenticate = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Response | void => {
+export const authenticate = (req: Request, res: Response, next: NextFunction): Response | void => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -50,11 +44,7 @@ export const authenticate = (
 };
 
 // Optional authentication middleware (doesn't fail if no token)
-export const optionalAuthenticate = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
+export const optionalAuthenticate = (req: Request, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -72,7 +62,7 @@ export const optionalAuthenticate = (
 };
 
 // Role-based authorization middleware
-export const authorize = (...allowedRoles: string[]) => {
+export const authorize = (..._allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction): Response | void => {
     if (!req.user) {
       return res.status(401).json({

@@ -1,12 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Button } from '../../src/components/ui/Button';
-import { Input } from '../../src/components/ui/Input';
-import { Card } from '../../src/components/ui/Card';
-
-// Mock clsx to avoid import issues in tests
-jest.mock('clsx', () => ({
-  clsx: (...args: any[]) => args.filter(Boolean).join(' '),
-}));
+import { Button } from './Button';
+import { Input } from './Input';
+import { Card } from './Card';
 
 describe('Button Component', () => {
   it('renders with default props', () => {
@@ -102,7 +97,7 @@ describe('Input Component', () => {
         label="Search"
         startAdornment={<span>🔍</span>}
         endAdornment={<button>Clear</button>}
-      />
+      />,
     );
 
     expect(screen.getByText('🔍')).toBeInTheDocument();
@@ -132,7 +127,7 @@ describe('Card Component', () => {
     render(
       <Card>
         <h1>Test Content</h1>
-      </Card>
+      </Card>,
     );
 
     expect(screen.getByText('Test Content')).toBeInTheDocument();

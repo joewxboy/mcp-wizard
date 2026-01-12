@@ -1,7 +1,6 @@
 import { prisma } from '../db/database';
-import { MCPServer, UserConfig, ConfigVersion, ValidationError } from '@mcp-wizard/shared';
+import { UserConfig, ValidationError } from '@mcp-wizard/shared';
 import { logger } from '../utils/logger';
-import { generateAccessToken } from '../config/jwt';
 import { keychainService } from './KeychainService';
 import { versionService } from './VersionService';
 
@@ -68,7 +67,11 @@ export class ConfigurationService {
       });
 
       // Handle secrets securely (store in keychain) using actual config ID
-      const secretReferences = await this.storeSecretsSecurely(userId, config.id, request.secrets || {});
+      const secretReferences = await this.storeSecretsSecurely(
+        userId,
+        config.id,
+        request.secrets || {},
+      );
 
       // Update configuration with secret references
       await prisma.userConfig.update({
@@ -77,13 +80,16 @@ export class ConfigurationService {
       });
 
       // Create initial version snapshot
-      await versionService.createVersionSnapshot(config.id, 'Initial configuration created', userId);
+      await versionService.createVersionSnapshot(
+        config.id,
+        'Initial configuration created',
+        userId,
+      );
 
       // Return updated config
       const updatedConfig = { ...config, secrets: secretReferences };
       logger.info(`Configuration created: ${config.id}`);
       return this.mapPrismaToUserConfig(updatedConfig);
-
     } catch (error) {
       logger.error('Error creating configuration:', error);
       throw error;
@@ -107,8 +113,7 @@ export class ConfigurationService {
         },
       });
 
-      return configs.map(config => this.mapPrismaToUserConfig(config));
-
+      return configs.map((config) => this.mapPrismaToUserConfig(config));
     } catch (error) {
       logger.error('Error getting user configurations:', error);
       throw new Error('Failed to retrieve configurations');
@@ -137,7 +142,6 @@ export class ConfigurationService {
       }
 
       return this.mapPrismaToUserConfig(config);
-
     } catch (error) {
       logger.error('Error getting configuration:', error);
       throw new Error('Failed to retrieve configuration');
@@ -147,7 +151,11 @@ export class ConfigurationService {
   /**
    * Update a configuration
    */
-  async updateConfig(configId: string, userId: string, updates: UpdateConfigRequest): Promise<UserConfig> {
+  async updateConfig(
+    configId: string,
+    userId: string,
+    updates: UpdateConfigRequest,
+  ): Promise<UserConfig> {
     try {
       logger.info(`Updating configuration ${configId} for user ${userId}`);
 
@@ -173,8 +181,8 @@ export class ConfigurationService {
         secretReferences = await this.updateSecretsSecurely(
           userId,
           configId,
-          existingConfig.secrets as any || {},
-          updates.secrets
+          existingConfig.secrets || [],
+          updates.secrets,
         );
       }
 
@@ -186,7 +194,7 @@ export class ConfigurationService {
           command: updates.command,
           args: updates.args,
           env: updates.env,
-          secrets: secretReferences,
+          secrets: secretReferences as any,
           targetClient: updates.targetClient,
           customFormat: updates.customFormat,
           enabled: updates.enabled,
@@ -204,7 +212,6 @@ export class ConfigurationService {
 
       logger.info(`Configuration updated: ${configId}`);
       return this.mapPrismaToUserConfig(updatedConfig);
-
     } catch (error) {
       logger.error('Error updating configuration:', error);
       throw error;
@@ -234,7 +241,6 @@ export class ConfigurationService {
       await this.deleteSecretsSecurely(userId, configId);
 
       logger.info(`Configuration deleted: ${configId}`);
-
     } catch (error) {
       logger.error('Error deleting configuration:', error);
       throw error;
@@ -244,12 +250,20 @@ export class ConfigurationService {
   /**
    * Validate a configuration
    */
-  async validateConfig(configId: string, userId: string): Promise<{ valid: boolean; errors: string[] }> {
+  async validateConfig(
+    configId: string,
+    userId: string,
+  ): Promise<{ valid: boolean; errors: string[] }> {
     try {
       const config = await this.getConfigById(configId, userId);
       if (!config) {
         return { valid: false, errors: ['Configuration not found'] };
       }
+
+      // Fetch the associated server
+      const server = await prisma.mCPServer.findUnique({
+        where: { id: config.serverId },
+      });
 
       const errors: string[] = [];
 
@@ -258,16 +272,17 @@ export class ConfigurationService {
         errors.push('Command is required');
       }
 
-      if (!config.server) {
+      if (!server) {
         errors.push('Associated MCP server not found');
       }
 
       // Check required parameters
-      const requiredParams = config.server?.requiredParams || [];
-      for (const param of requiredParams) {
-        const envValue = config.env?.[param.key];
-        if (!envValue && param.required) {
-          errors.push(`Required parameter '${param.key}' is missing`);
+      if (server?.requiredParams && Array.isArray(server.requiredParams)) {
+        for (const param of server.requiredParams as any[]) {
+          const envValue = config.env?.[param.key];
+          if (!envValue && param.required) {
+            errors.push(`Required parameter '${param.key}' is missing`);
+          }
         }
       }
 
@@ -275,7 +290,6 @@ export class ConfigurationService {
         valid: errors.length === 0,
         errors,
       };
-
     } catch (error) {
       logger.error('Error validating configuration:', error);
       return {
@@ -304,7 +318,11 @@ export class ConfigurationService {
   /**
    * Store secrets securely in keychain
    */
-  private async storeSecretsSecurely(userId: string, configId: string, secrets: Record<string, string>): Promise<any> {
+  private async storeSecretsSecurely(
+    userId: string,
+    configId: string,
+    secrets: Record<string, string>,
+  ): Promise<any> {
     const references: any = {};
 
     for (const [key, value] of Object.entries(secrets)) {
@@ -314,7 +332,7 @@ export class ConfigurationService {
           configId,
           key,
           value,
-          `Secret for ${key}`
+          `Secret for ${key}`,
         );
         references[key] = secretRef;
       } catch (error) {
@@ -333,7 +351,7 @@ export class ConfigurationService {
     userId: string,
     configId: string,
     existingRefs: any,
-    newSecrets: Record<string, string>
+    newSecrets: Record<string, string>,
   ): Promise<any> {
     // Start with existing references
     const updatedRefs = { ...existingRefs };
@@ -348,7 +366,7 @@ export class ConfigurationService {
             configId,
             key,
             value,
-            `Secret for ${key}`
+            `Secret for ${key}`,
           );
           updatedRefs[key] = secretRef;
         } else {
@@ -358,7 +376,7 @@ export class ConfigurationService {
             configId,
             key,
             value,
-            `Secret for ${key}`
+            `Secret for ${key}`,
           );
           updatedRefs[key] = secretRef;
         }
@@ -382,8 +400,6 @@ export class ConfigurationService {
       // Don't throw - config deletion should succeed even if secrets cleanup fails
     }
   }
-
-
 
   /**
    * Map Prisma config to UserConfig type

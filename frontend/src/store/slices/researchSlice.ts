@@ -36,11 +36,16 @@ export const discoverMCPServers = createAsyncThunk(
   'research/discoverMCPServers',
   async ({ query, limit }: { query?: string; limit?: number }, { rejectWithValue }) => {
     try {
-      const params = new URLSearchParams();
-      if (query) params.append('query', query);
-      if (limit) params.append('limit', limit?.toString() || '30');
-
-      const response = await fetch(`/api/research/discover?${params}`);
+      const response = await fetch('/api/research/discover', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query || 'MCP server',
+          limit: limit || 30,
+        }),
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -53,7 +58,7 @@ export const discoverMCPServers = createAsyncThunk(
       const maxAttempts = 30; // 30 seconds max
 
       while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         const statusResponse = await fetch(`/api/research/status/${jobId}`);
         const statusData = await statusResponse.json();
@@ -77,7 +82,7 @@ export const discoverMCPServers = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
-  }
+  },
 );
 
 export const getMCPServerDetails = createAsyncThunk(
@@ -95,7 +100,34 @@ export const getMCPServerDetails = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
-  }
+  },
+);
+
+export const analyzeRepository = createAsyncThunk(
+  'research/analyzeRepository',
+  async (url: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/research/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to analyze repository');
+      }
+
+      return {
+        server: data.server,
+        analyzed: data.analyzed,
+      };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  },
 );
 
 export const getRateLimitStatus = createAsyncThunk(
@@ -113,7 +145,7 @@ export const getRateLimitStatus = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
-  }
+  },
 );
 
 export const researchSlice = createSlice({
@@ -168,6 +200,28 @@ export const researchSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
+      // Analyze repository
+      .addCase(analyzeRepository.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(analyzeRepository.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload.server) {
+          state.servers = [action.payload.server];
+          state.totalCount = 1;
+          state.error = null;
+        } else {
+          state.servers = [];
+          state.totalCount = 0;
+          state.error =
+            'Repository could not be analyzed. It may not exist or may not be a valid MCP server.';
+        }
+      })
+      .addCase(analyzeRepository.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
       // Get rate limit status
       .addCase(getRateLimitStatus.fulfilled, (state, action) => {
         state.rateLimit = {
@@ -179,11 +233,7 @@ export const researchSlice = createSlice({
   },
 });
 
-export const {
-  setSearchQuery,
-  clearSearchResults,
-  setSelectedServer,
-  clearError,
-} = researchSlice.actions;
+export const { setSearchQuery, clearSearchResults, setSelectedServer, clearError } =
+  researchSlice.actions;
 
 export default researchSlice.reducer;

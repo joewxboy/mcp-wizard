@@ -17,8 +17,8 @@ export interface StoredSecret {
 
 export class KeychainService {
   private static readonly SERVICE_NAME = 'mcp-wizard';
-  private static readonly ENCRYPTION_KEY = process.env.KEYCHAIN_ENCRYPTION_KEY ||
-    'default-key-change-in-production-32-chars';
+  private static readonly ENCRYPTION_KEY =
+    process.env.KEYCHAIN_ENCRYPTION_KEY || 'default-key-change-in-production-32-chars';
 
   /**
    * Store a secret securely in the system keychain
@@ -28,7 +28,7 @@ export class KeychainService {
     configId: string,
     key: string,
     value: string,
-    description?: string
+    description?: string,
   ): Promise<SecretReference> {
     try {
       const keychainId = this.generateKeychainId(userId, configId, key);
@@ -44,15 +44,7 @@ export class KeychainService {
         createdAt: new Date().toISOString(),
       };
 
-      const success = await keytar.setPassword(
-        KeychainService.SERVICE_NAME,
-        accountName,
-        JSON.stringify(metadata)
-      );
-
-      if (!success) {
-        throw new Error('Failed to store secret in keychain');
-      }
+      await keytar.setPassword(KeychainService.SERVICE_NAME, accountName, JSON.stringify(metadata));
 
       logger.info(`Secret stored securely for user ${userId}, config ${configId}, key ${key}`);
 
@@ -61,7 +53,6 @@ export class KeychainService {
         description: metadata.description,
         createdAt: new Date(metadata.createdAt),
       };
-
     } catch (error) {
       logger.error('Error storing secret in keychain:', error);
       throw new Error('Failed to store secret securely');
@@ -71,18 +62,11 @@ export class KeychainService {
   /**
    * Retrieve a secret from the system keychain
    */
-  async getSecret(
-    userId: string,
-    configId: string,
-    key: string
-  ): Promise<string | null> {
+  async getSecret(userId: string, configId: string, key: string): Promise<string | null> {
     try {
       const accountName = `${userId}:${configId}:${key}`;
 
-      const storedData = await keytar.getPassword(
-        KeychainService.SERVICE_NAME,
-        accountName
-      );
+      const storedData = await keytar.getPassword(KeychainService.SERVICE_NAME, accountName);
 
       if (!storedData) {
         return null;
@@ -92,11 +76,7 @@ export class KeychainService {
 
       // Update last accessed time
       metadata.lastAccessed = new Date();
-      await keytar.setPassword(
-        KeychainService.SERVICE_NAME,
-        accountName,
-        JSON.stringify(metadata)
-      );
+      await keytar.setPassword(KeychainService.SERVICE_NAME, accountName, JSON.stringify(metadata));
 
       // Decrypt and return the value
       const decryptedValue = this.decrypt(metadata.value);
@@ -104,7 +84,6 @@ export class KeychainService {
       logger.debug(`Secret retrieved for user ${userId}, config ${configId}, key ${key}`);
 
       return decryptedValue;
-
     } catch (error) {
       logger.error('Error retrieving secret from keychain:', error);
       throw new Error('Failed to retrieve secret');
@@ -119,16 +98,13 @@ export class KeychainService {
     configId: string,
     key: string,
     newValue: string,
-    newDescription?: string
+    newDescription?: string,
   ): Promise<SecretReference> {
     try {
       const accountName = `${userId}:${configId}:${key}`;
 
       // Get existing data
-      const existingData = await keytar.getPassword(
-        KeychainService.SERVICE_NAME,
-        accountName
-      );
+      const existingData = await keytar.getPassword(KeychainService.SERVICE_NAME, accountName);
 
       if (!existingData) {
         throw new Error('Secret not found');
@@ -143,11 +119,7 @@ export class KeychainService {
       }
       metadata.lastAccessed = new Date();
 
-      await keytar.setPassword(
-        KeychainService.SERVICE_NAME,
-        accountName,
-        JSON.stringify(metadata)
-      );
+      await keytar.setPassword(KeychainService.SERVICE_NAME, accountName, JSON.stringify(metadata));
 
       logger.info(`Secret updated for user ${userId}, config ${configId}, key ${key}`);
 
@@ -156,7 +128,6 @@ export class KeychainService {
         description: metadata.description,
         createdAt: new Date(metadata.createdAt),
       };
-
     } catch (error) {
       logger.error('Error updating secret:', error);
       throw new Error('Failed to update secret');
@@ -166,27 +137,21 @@ export class KeychainService {
   /**
    * Delete a secret from the keychain
    */
-  async deleteSecret(
-    userId: string,
-    configId: string,
-    key: string
-  ): Promise<boolean> {
+  async deleteSecret(userId: string, configId: string, key: string): Promise<boolean> {
     try {
       const accountName = `${userId}:${configId}:${key}`;
 
-      const success = await keytar.deletePassword(
-        KeychainService.SERVICE_NAME,
-        accountName
-      );
+      const success = await keytar.deletePassword(KeychainService.SERVICE_NAME, accountName);
 
       if (success) {
         logger.info(`Secret deleted for user ${userId}, config ${configId}, key ${key}`);
       } else {
-        logger.warn(`Secret not found for deletion: user ${userId}, config ${configId}, key ${key}`);
+        logger.warn(
+          `Secret not found for deletion: user ${userId}, config ${configId}, key ${key}`,
+        );
       }
 
       return success;
-
     } catch (error) {
       logger.error('Error deleting secret:', error);
       throw new Error('Failed to delete secret');
@@ -206,7 +171,7 @@ export class KeychainService {
       let deletedCount = 0;
       for (const credential of credentials) {
         // Parse the account name to check ownership
-        const [credUserId, credConfigId, key] = credential.account.split(':');
+        const [credUserId, credConfigId] = credential.account.split(':');
 
         if (credUserId === userId && credConfigId === configId) {
           await keytar.deletePassword(KeychainService.SERVICE_NAME, credential.account);
@@ -216,7 +181,6 @@ export class KeychainService {
 
       logger.info(`Deleted ${deletedCount} secrets for config ${configId}`);
       return deletedCount;
-
     } catch (error) {
       logger.error('Error deleting config secrets:', error);
       throw new Error('Failed to delete configuration secrets');
@@ -246,7 +210,6 @@ export class KeychainService {
       }
 
       return secrets;
-
     } catch (error) {
       logger.error('Error listing config secrets:', error);
       throw new Error('Failed to list configuration secrets');
@@ -267,7 +230,6 @@ export class KeychainService {
       await keytar.deletePassword(KeychainService.SERVICE_NAME, testAccount);
 
       return retrieved === testValue;
-
     } catch (error) {
       logger.warn('Keychain not available:', error);
       return false;
@@ -287,7 +249,7 @@ export class KeychainService {
   private encrypt(value: string): string {
     try {
       const key = crypto.scryptSync(KeychainService.ENCRYPTION_KEY, 'salt', 32);
-      const iv = crypto.randomBytes(16);
+      const _iv = crypto.randomBytes(16);
       const cipher = crypto.createCipher('aes-256-gcm', key);
 
       let encrypted = cipher.update(value, 'utf8', 'hex');
@@ -296,8 +258,7 @@ export class KeychainService {
       const authTag = cipher.getAuthTag();
 
       // Combine IV, auth tag, and encrypted data
-      return Buffer.concat([iv, authTag, Buffer.from(encrypted, 'hex')]).toString('base64');
-
+      return Buffer.concat([_iv, authTag, Buffer.from(encrypted, 'hex')]).toString('base64');
     } catch (error) {
       logger.error('Error encrypting value:', error);
       throw new Error('Encryption failed');
@@ -312,8 +273,7 @@ export class KeychainService {
       const key = crypto.scryptSync(KeychainService.ENCRYPTION_KEY, 'salt', 32);
       const buffer = Buffer.from(encryptedData, 'base64');
 
-      // Extract IV, auth tag, and encrypted data
-      const iv = buffer.subarray(0, 16);
+      // Extract IV (not used in decryption), auth tag, and encrypted data
       const authTag = buffer.subarray(16, 32);
       const encrypted = buffer.subarray(32);
 
@@ -324,7 +284,6 @@ export class KeychainService {
       decrypted = Buffer.concat([decrypted, decipher.final()]);
 
       return decrypted.toString('utf8');
-
     } catch (error) {
       logger.error('Error decrypting value:', error);
       throw new Error('Decryption failed');

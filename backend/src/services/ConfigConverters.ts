@@ -17,7 +17,7 @@ export class ConfigConverters {
   /**
    * Convert configuration to Claude Desktop format
    */
-  static toClaudeDesktop(config: UserConfig, server: MCPServer): ExportResult {
+  static toClaudeDesktop(config: UserConfig, _server: MCPServer): ExportResult {
     try {
       const claudeConfig = {
         mcpServers: {
@@ -130,7 +130,7 @@ export class ConfigConverters {
 
     if (config.args && config.args.length > 0) {
       lines.push('  args:');
-      config.args.forEach(arg => {
+      config.args.forEach((arg) => {
         lines.push(`    - "${arg}"`);
       });
     }
@@ -155,7 +155,11 @@ export class ConfigConverters {
   /**
    * Apply custom template with variable substitution
    */
-  private static applyCustomTemplate(template: string, config: UserConfig, server: MCPServer): string {
+  private static applyCustomTemplate(
+    template: string,
+    config: UserConfig,
+    server: MCPServer,
+  ): string {
     let result = template;
 
     // Replace configuration variables
@@ -196,7 +200,6 @@ export class ConfigConverters {
       if (result.content.length === 0) {
         errors.push('Content cannot be empty');
       }
-
     } catch (error) {
       errors.push(`Invalid ${result.format} format: ${error}`);
     }

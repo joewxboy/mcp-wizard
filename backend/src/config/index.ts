@@ -1,4 +1,3 @@
-// @ts-ignore - dotenv types
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -11,7 +10,8 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
 
   // Database configuration
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/mcp_wizard',
+  databaseUrl:
+    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/mcp_wizard',
 
   // Redis configuration
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',

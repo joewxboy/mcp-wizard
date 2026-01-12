@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from './index';
 
 export interface JWTPayload {
@@ -17,7 +17,7 @@ export const generateAccessToken = (payload: JWTPayload): string => {
     expiresIn: config.jwtExpiresIn,
     issuer: 'mcp-wizard',
     audience: 'mcp-wizard-users',
-  } as any);
+  } as SignOptions);
 };
 
 export const generateRefreshToken = (payload: JWTRefreshPayload): string => {
@@ -25,7 +25,7 @@ export const generateRefreshToken = (payload: JWTRefreshPayload): string => {
     expiresIn: config.jwtRefreshExpiresIn,
     issuer: 'mcp-wizard',
     audience: 'mcp-wizard-refresh',
-  } as any);
+  } as SignOptions);
 };
 
 export const verifyAccessToken = (token: string): JWTPayload => {

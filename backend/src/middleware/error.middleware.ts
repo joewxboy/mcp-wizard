@@ -7,7 +7,7 @@ export class HttpError extends Error {
   constructor(
     public statusCode: number,
     message: string,
-    public isOperational = true
+    public isOperational = true,
   ) {
     super(message);
     this.name = 'HttpError';
@@ -33,7 +33,7 @@ export const errorHandler = (
   error: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction,
 ): Response<ErrorResponse> => {
   let statusCode = 500;
   let message = 'Internal server error';
@@ -102,7 +102,7 @@ export const errorHandler = (
 export const notFoundHandler = (
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction,
 ): Response<ErrorResponse> => {
   return res.status(404).json({
     success: false,

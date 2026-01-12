@@ -46,7 +46,7 @@ export const disconnectRedis = async () => {
 };
 
 // Cache helper functions
-export const setCache = async (key: string, value: any, ttl?: number) => {
+export const setCache = async (key: string, value: unknown, ttl?: number) => {
   const client = getRedisClient();
   const serializedValue = JSON.stringify(value);
 

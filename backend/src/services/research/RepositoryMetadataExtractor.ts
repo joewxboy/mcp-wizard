@@ -1,4 +1,4 @@
-import { GitHubAPIClient, githubClient } from './GitHubAPIClient';
+import { GitHubAPIClient, githubClient, GitHubRepo } from './GitHubAPIClient';
 import { logger } from '../../utils/logger';
 import { MCPServer } from '@mcp-wizard/shared';
 
@@ -46,16 +46,14 @@ export class RepositoryMetadataExtractor {
       // Get repository information
       const repoInfo = await this.githubClient.getRepository(owner, repo);
 
-      // Skip if repository has too few stars (likely not maintained)
-      if (repoInfo.stargazers_count < 5) {
-        logger.debug(`Skipping repository ${owner}/${repo} - too few stars (${repoInfo.stargazers_count})`);
-        return null;
-      }
-
       // Get package.json
       let packageJson: PackageJson | null = null;
       try {
-        const packageJsonContent = await this.githubClient.downloadFile(owner, repo, 'package.json');
+        const packageJsonContent = await this.githubClient.downloadFile(
+          owner,
+          repo,
+          'package.json',
+        );
         packageJson = JSON.parse(packageJsonContent);
       } catch (error) {
         logger.debug(`No package.json found in ${owner}/${repo}`);
@@ -82,6 +80,15 @@ export class RepositoryMetadataExtractor {
         return null;
       }
 
+      // Apply star count filter only after confirming it's an MCP repository
+      // Lower threshold for MCP repositories (they might be newer/less popular but still valid)
+      if (repoInfo.stargazers_count < 1) {
+        logger.debug(
+          `Skipping repository ${owner}/${repo} - too few stars (${repoInfo.stargazers_count})`,
+        );
+        return null;
+      }
+
       // Generate configuration template
       const configTemplate = this.generateConfigTemplate(mcpMetadata, packageJson);
 
@@ -100,7 +107,7 @@ export class RepositoryMetadataExtractor {
         author: this.extractAuthor(packageJson),
         license: packageJson?.license || repoInfo.license?.name || '',
         tags: this.extractTags(packageJson, repoInfo),
-        readme,
+        readme: readme.length > 2000 ? readme.substring(0, 2000) + '...' : readme,
         tools: mcpMetadata.tools,
         resources: mcpMetadata.resources,
         prompts: mcpMetadata.prompts,
@@ -116,7 +123,6 @@ export class RepositoryMetadataExtractor {
 
       logger.info(`Successfully analyzed MCP server: ${owner}/${repo}`);
       return mcpServer;
-
     } catch (error) {
       logger.error(`Error analyzing repository ${owner}/${repo}:`, error);
       return null;
@@ -130,7 +136,7 @@ export class RepositoryMetadataExtractor {
     owner: string,
     repo: string,
     packageJson: PackageJson | null,
-    readme: string
+    readme: string,
   ): Promise<MCPMetadata> {
     const metadata: MCPMetadata = {
       hasMCP: false,
@@ -148,7 +154,7 @@ export class RepositoryMetadataExtractor {
       const isMCP = this.checkPackageForMCP(packageJson);
       if (isMCP) {
         metadata.hasMCP = true;
-        metadata.command = packageJson.name;
+        metadata.command = packageJson.name || null;
       }
     }
 
@@ -164,23 +170,25 @@ export class RepositoryMetadataExtractor {
     // Try to find MCP schema files
     try {
       const rootContents = await this.githubClient.getRepositoryContents(owner, repo);
-      const mcpFiles = rootContents.filter(file =>
-        file.name.includes('mcp') ||
-        file.name.includes('schema') ||
-        file.name.endsWith('.json') ||
-        file.name.endsWith('.yaml') ||
-        file.name.endsWith('.yml')
+      const mcpFiles = rootContents.filter(
+        (file) =>
+          file.name.includes('mcp') ||
+          file.name.includes('schema') ||
+          file.name.endsWith('.json') ||
+          file.name.endsWith('.yaml') ||
+          file.name.endsWith('.yml'),
       );
 
-      for (const file of mcpFiles.slice(0, 5)) { // Limit to first 5 files
+      for (const file of mcpFiles.slice(0, 5)) {
+        // Limit to first 5 files
         try {
           const content = await this.githubClient.downloadFile(owner, repo, file.path);
           const fileMetadata = this.extractMCPFromSchemaFile(content, file.name);
           if (fileMetadata.hasMCP) {
             metadata.hasMCP = true;
-            metadata.tools.push(...fileMetadata.tools);
-            metadata.resources.push(...fileMetadata.resources);
-            metadata.prompts.push(...fileMetadata.prompts);
+            metadata.tools.push(...(fileMetadata.tools || []));
+            metadata.resources.push(...(fileMetadata.resources || []));
+            metadata.prompts.push(...(fileMetadata.prompts || []));
           }
         } catch (error) {
           logger.debug(`Could not parse MCP file ${file.path}:`, error);
@@ -197,24 +205,31 @@ export class RepositoryMetadataExtractor {
    * Check if package.json indicates MCP usage
    */
   private checkPackageForMCP(packageJson: PackageJson): boolean {
-    const { dependencies = {}, devDependencies = {}, keywords = [], description = '' } = packageJson;
+    const {
+      dependencies = {},
+      devDependencies = {},
+      keywords = [],
+      description = '',
+    } = packageJson;
 
     // Check dependencies for MCP-related packages
     const allDeps = { ...dependencies, ...devDependencies };
-    const hasMCPDeps = Object.keys(allDeps).some(dep =>
-      dep.toLowerCase().includes('mcp') ||
-      dep.toLowerCase().includes('model-context-protocol')
+    const hasMCPDeps = Object.keys(allDeps).some(
+      (dep) =>
+        dep.toLowerCase().includes('mcp') || dep.toLowerCase().includes('model-context-protocol'),
     );
 
     // Check keywords
-    const hasMCPKeywords = keywords.some(keyword =>
-      keyword.toLowerCase().includes('mcp') ||
-      keyword.toLowerCase().includes('model context protocol')
+    const hasMCPKeywords = keywords.some(
+      (keyword) =>
+        keyword.toLowerCase().includes('mcp') ||
+        keyword.toLowerCase().includes('model context protocol'),
     );
 
     // Check description
-    const hasMCPDescription = description.toLowerCase().includes('mcp') ||
-                             description.toLowerCase().includes('model context protocol');
+    const hasMCPDescription =
+      description.toLowerCase().includes('mcp') ||
+      description.toLowerCase().includes('model context protocol');
 
     return hasMCPDeps || hasMCPKeywords || hasMCPDescription;
   }
@@ -232,7 +247,9 @@ export class RepositoryMetadataExtractor {
     metadata.hasMCP = true;
 
     // Try to extract command information
-    const commandMatch = readme.match(/```(?:json|bash|sh)\s*\n\s*{\s*"mcpServers"\s*:\s*{[^}]*"command"\s*:\s*"([^"]+)"/s);
+    const commandMatch = readme.match(
+      /```(?:json|bash|sh)\s*\n\s*{\s*"mcpServers"\s*:\s*{[^}]*"command"\s*:\s*"([^"]+)"/s,
+    );
     if (commandMatch) {
       metadata.command = commandMatch[1];
     }
@@ -280,7 +297,6 @@ export class RepositoryMetadataExtractor {
         metadata.hasMCP = true;
         metadata.prompts = data.prompts;
       }
-
     } catch (error) {
       logger.debug(`Error parsing schema file ${filename}:`, error);
     }
@@ -308,7 +324,10 @@ export class RepositoryMetadataExtractor {
 
         if (value.startsWith('[') && value.endsWith(']')) {
           // Simple array parsing
-          result[key] = value.slice(1, -1).split(',').map(item => item.trim().replace(/"/g, ''));
+          result[key] = value
+            .slice(1, -1)
+            .split(',')
+            .map((item) => item.trim().replace(/"/g, ''));
         } else if (value.startsWith('{') && value.endsWith('}')) {
           // Simple object parsing
           result[key] = JSON.parse(value);
@@ -369,9 +388,11 @@ export class RepositoryMetadataExtractor {
     if (!value) return 'string';
 
     // Check for API keys/secrets
-    if (value.toLowerCase().includes('key') ||
-        value.toLowerCase().includes('token') ||
-        value.toLowerCase().includes('secret')) {
+    if (
+      value.toLowerCase().includes('key') ||
+      value.toLowerCase().includes('token') ||
+      value.toLowerCase().includes('secret')
+    ) {
       return 'secret';
     }
 
@@ -413,10 +434,10 @@ export class RepositoryMetadataExtractor {
     const tags = new Set<string>();
 
     // Add GitHub topics
-    repoInfo.topics?.forEach(topic => tags.add(topic));
+    repoInfo.topics?.forEach((topic: string) => tags.add(topic));
 
     // Add package keywords
-    packageJson?.keywords?.forEach(keyword => tags.add(keyword));
+    packageJson?.keywords?.forEach((keyword) => tags.add(keyword));
 
     // Add MCP-related tags
     tags.add('mcp');

@@ -1,5 +1,4 @@
 import { prisma } from '../db/database';
-import { ConfigVersion } from '@mcp-wizard/shared';
 import { logger } from '../utils/logger';
 
 export interface VersionInfo {
@@ -36,7 +35,7 @@ export class VersionService {
         orderBy: { version: 'desc' },
       });
 
-      return versions.map(v => ({
+      return versions.map((v) => ({
         id: v.id,
         version: v.version,
         changeDescription: v.changeDescription || 'No description',
@@ -44,7 +43,6 @@ export class VersionService {
         createdBy: v.createdBy,
         config: v.config,
       }));
-
     } catch (error) {
       logger.error('Error getting config versions:', error);
       throw new Error('Failed to retrieve configuration versions');
@@ -54,7 +52,11 @@ export class VersionService {
   /**
    * Get a specific version of a configuration
    */
-  async getConfigVersion(configId: string, version: number, userId: string): Promise<VersionInfo | null> {
+  async getConfigVersion(
+    configId: string,
+    version: number,
+    userId: string,
+  ): Promise<VersionInfo | null> {
     try {
       logger.debug(`Getting version ${version} for config ${configId} owned by ${userId}`);
 
@@ -89,7 +91,6 @@ export class VersionService {
         createdBy: versionData.createdBy,
         config: versionData.config,
       };
-
     } catch (error) {
       logger.error('Error getting config version:', error);
       throw new Error('Failed to retrieve configuration version');
@@ -99,7 +100,12 @@ export class VersionService {
   /**
    * Rollback configuration to a specific version
    */
-  async rollbackConfig(configId: string, version: number, userId: string, rollbackReason?: string): Promise<any> {
+  async rollbackConfig(
+    configId: string,
+    version: number,
+    userId: string,
+    rollbackReason?: string,
+  ): Promise<any> {
     try {
       logger.info(`Rolling back config ${configId} to version ${version} for user ${userId}`);
 
@@ -146,8 +152,8 @@ export class VersionService {
       });
 
       // Create a new version snapshot for the rollback
-      const changeDescription = rollbackReason ||
-        `Rolled back to version ${version}: ${targetVersion.changeDescription}`;
+      const changeDescription =
+        rollbackReason || `Rolled back to version ${version}: ${targetVersion.changeDescription}`;
 
       await prisma.configVersion.create({
         data: {
@@ -167,7 +173,6 @@ export class VersionService {
         newVersion: updatedConfig.version,
         changeDescription,
       };
-
     } catch (error) {
       logger.error('Error rolling back configuration:', error);
       throw error;
@@ -177,7 +182,12 @@ export class VersionService {
   /**
    * Compare two versions of a configuration
    */
-  async compareVersions(configId: string, version1: number, version2: number, userId: string): Promise<any> {
+  async compareVersions(
+    configId: string,
+    version1: number,
+    version2: number,
+    userId: string,
+  ): Promise<any> {
     try {
       logger.debug(`Comparing versions ${version1} and ${version2} for config ${configId}`);
 
@@ -202,7 +212,6 @@ export class VersionService {
         differences,
         hasDifferences: Object.keys(differences).length > 0,
       };
-
     } catch (error) {
       logger.error('Error comparing versions:', error);
       throw new Error('Failed to compare configuration versions');
@@ -214,7 +223,9 @@ export class VersionService {
    */
   async cleanupOldVersions(configId: string, keepVersions: number = 10): Promise<number> {
     try {
-      logger.debug(`Cleaning up old versions for config ${configId}, keeping ${keepVersions} versions`);
+      logger.debug(
+        `Cleaning up old versions for config ${configId}, keeping ${keepVersions} versions`,
+      );
 
       // Get all versions for this config
       const allVersions = await prisma.configVersion.findMany({
@@ -231,13 +242,12 @@ export class VersionService {
       const versionsToDelete = allVersions.slice(keepVersions);
       const deletedCount = await prisma.configVersion.deleteMany({
         where: {
-          id: { in: versionsToDelete.map(v => v.id) },
+          id: { in: versionsToDelete.map((v) => v.id) },
         },
       });
 
       logger.info(`Cleaned up ${deletedCount.count} old versions for config ${configId}`);
       return deletedCount.count;
-
     } catch (error) {
       logger.error('Error cleaning up old versions:', error);
       throw new Error('Failed to cleanup old versions');
@@ -250,7 +260,7 @@ export class VersionService {
   async createVersionSnapshot(
     configId: string,
     changeDescription: string,
-    userId: string
+    userId: string,
   ): Promise<void> {
     try {
       const config = await prisma.userConfig.findUnique({
@@ -327,8 +337,10 @@ export class VersionService {
     const secretKeys1 = Object.keys(secrets1);
     const secretKeys2 = Object.keys(secrets2);
 
-    if (secretKeys1.length !== secretKeys2.length ||
-        !secretKeys1.every(key => secretKeys2.includes(key))) {
+    if (
+      secretKeys1.length !== secretKeys2.length ||
+      !secretKeys1.every((key) => secretKeys2.includes(key))
+    ) {
       differences.secrets = {
         from: secretKeys1,
         to: secretKeys2,
