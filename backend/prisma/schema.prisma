@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  configs UserConfig[]
+
+  @@map("users")
+}
+
+model MCPServer {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  source            String // 'github' | 'npm' | 'manual'
+  sourceUrl         String
+  packageName       String?
+  version           String
+  author            String
+  license           String
+  tags              String[] // JSON array of tags
+  readme            String
+  tools             Json     // MCP tool schemas
+  resources         Json     // MCP resource schemas
+  prompts           Json     // MCP prompt schemas
+  configTemplate    Json     // Configuration template
+  requiredParams    Json     // Required configuration parameters
+  optionalParams    Json     // Optional configuration parameters
+  popularity        Int      @default(0)
+  verified          Boolean  @default(false)
+  lastResearchedAt  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  configs UserConfig[]
+
+  @@map("mcp_servers")
+}
+
+model UserConfig {
+  id               String   @id @default(cuid())
+  userId           String
+  serverId         String
+  name             String
+  enabled          Boolean  @default(true)
+  command          String
+  args             String[] // JSON array of arguments
+  env              Json     // Environment variables object
+  secrets          Json?    // References to keychain secrets
+  targetClient     String   // 'claude-desktop' | 'custom'
+  customFormat     String?
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server           MCPServer    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  versions         ConfigVersion[]
+
+  @@map("user_configs")
+}
+
+model ConfigVersion {
+  id             String     @id @default(cuid())
+  configId       String
+  version        Int
+  config         Json       // Complete config snapshot
+  changeDescription String?
+  createdAt      DateTime   @default(now())
+  createdBy      String     // User ID who made the change
+
+  // Relations
+  userConfig     UserConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@map("config_versions")
+}

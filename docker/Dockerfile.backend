@@ -1,0 +1,28 @@
+FROM node:18-alpine
+
+# Install build dependencies for native modules (node-keytar)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    libsecret-dev
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy application code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Expose port
+EXPOSE 3001
+
+# Start application
+CMD ["npm", "run", "dev"]
